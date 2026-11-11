@@ -1,0 +1,47 @@
+#!/bin/sh
+# pre-commit: upstream's goimports check (git/pre-commit), then the tests of what the commit touches: the Go
+# packages with staged .go files, each from its own module, and the UI suite when ui/ is staged.
+# Enable once per clone: git config core.hooksPath .githooks
+#
+# It tests the working tree, not only what is staged. The full suite stays the pre-push hook's job.
+
+set -eu
+root="$(git rev-parse --show-toplevel)"
+cd "$root"
+
+fail() {
+  echo ""
+  echo "pre-commit FAILED: $*"
+  exit 1
+}
+
+staged="$(git diff --cached --name-only --diff-filter=ACMR)"
+go_dirs="$(echo "$staged" | grep '\.go$' | xargs -r -n1 dirname | sort -u)"
+
+# Checked first: upstream's goimports check needs Go too, and would only say "command not found".
+if [ -n "$go_dirs" ] && ! command -v go >/dev/null 2>&1; then
+  fail "go is not installed; navidrome needs Go $(sed -n 's/^go //p' go.mod)"
+fi
+
+"$root/git/pre-commit"
+
+if [ -n "$go_dirs" ]; then
+  # A package is tested from the module that owns it: plugins/ holds several nested modules, which go test
+  # run from the root cannot reach.
+  for dir in $go_dirs; do
+    mod="$dir"
+    while [ "$mod" != "." ] && [ ! -f "$mod/go.mod" ]; do mod="$(dirname "$mod")"; done
+    if [ "$mod" = "." ]; then pkg="./$dir"; else pkg=".${dir#"$mod"}"; fi
+    [ "$pkg" = "./." ] && pkg="."
+    echo "$mod $pkg"
+  done | sort -u | while read -r mod pkg; do
+    echo "pre-commit: go test $pkg (module $mod)"
+    (cd "$mod" && go test -tags netgo,sqlite_fts5 -count=1 "$pkg") || fail "go test $pkg in $mod"
+  done
+fi
+
+if echo "$staged" | grep -q '^ui/'; then
+  [ -d ui/node_modules ] || fail "ui/ is staged but ui/node_modules is missing; run: (cd ui && npm ci)"
+  echo "pre-commit: UI tests"
+  (cd ui && npm test) || fail "UI tests"
+fi

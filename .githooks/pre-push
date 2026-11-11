@@ -1,0 +1,3 @@
+#!/bin/sh
+# Upstream's pre-push (make pre-push: lint and the full test suite), unchanged.
+exec "$(git rev-parse --show-toplevel)/git/pre-push" "$@"
