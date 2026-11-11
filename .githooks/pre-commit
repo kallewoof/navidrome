@@ -1,6 +1,8 @@
 #!/bin/sh
 # pre-commit: upstream's goimports check (git/pre-commit), then the tests of what the commit touches: the Go
-# packages with staged .go files, each from its own module, and the UI suite when ui/ is staged.
+# packages with staged .go files, each from its own module, and the UI suite when ui/ is staged. A root-module
+# package must also keep its statement coverage at or above its entry in .githooks/coverage-baseline.txt
+# (recorded by .githooks/coverage-baseline.sh).
 # Enable once per clone: git config core.hooksPath .githooks
 #
 # It tests the working tree, not only what is staged. The full suite stays the pre-push hook's job.
@@ -25,6 +27,35 @@ fi
 
 "$root/git/pre-commit"
 
+baseline=.githooks/coverage-baseline.txt
+module="$(sed -n 's/^module //p' go.mod)"
+
+check_coverage() {
+  pkg="$1"
+  [ -f "$baseline" ] ||
+    fail "no coverage baseline yet; record it once with .githooks/coverage-baseline.sh (the whole suite, minutes)"
+  echo "pre-commit: go test -cover $pkg"
+  out="$(go test -tags netgo,sqlite_fts5 -count=1 -cover "$pkg" 2>&1)" || {
+    echo "$out" | tail -40
+    fail "go test $pkg"
+  }
+  path="$module${pkg#.}"
+  measured="$(echo "$out" | "$root/.githooks/coverage-parse.sh" | awk -v p="$path" '$1 == p { print $2 }')"
+  floor="$(awk -v p="$path" '$1 == p { print $2 }' "$baseline")"
+  if [ -z "$measured" ]; then
+    echo "  no statements to cover"
+  elif [ -z "$floor" ]; then
+    echo "  $measured% (no floor yet: .githooks/coverage-baseline.sh $pkg)"
+  elif awk -v m="$measured" -v f="$floor" 'BEGIN { exit !(m < f) }'; then
+    fail "coverage of $path fell from $floor% to $measured%"
+  else
+    echo "  $measured% (floor $floor%)"
+    if awk -v m="$measured" -v f="$floor" 'BEGIN { exit !(m >= f + 0.5) }'; then
+      echo "  above the floor by 0.5 points or more; raise it: .githooks/coverage-baseline.sh $pkg"
+    fi
+  fi
+}
+
 if [ -n "$go_dirs" ]; then
   # A package is tested from the module that owns it: plugins/ holds several nested modules, which go test
   # run from the root cannot reach.
@@ -35,8 +66,12 @@ if [ -n "$go_dirs" ]; then
     [ "$pkg" = "./." ] && pkg="."
     echo "$mod $pkg"
   done | sort -u | while read -r mod pkg; do
-    echo "pre-commit: go test $pkg (module $mod)"
-    (cd "$mod" && go test -tags netgo,sqlite_fts5 -count=1 "$pkg") || fail "go test $pkg in $mod"
+    if [ "$mod" != "." ]; then
+      echo "pre-commit: go test $pkg (module $mod)"
+      (cd "$mod" && go test -tags netgo,sqlite_fts5 -count=1 "$pkg") || fail "go test $pkg in $mod"
+      continue
+    fi
+    check_coverage "$pkg"
   done
 fi
 
