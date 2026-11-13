@@ -416,6 +416,20 @@ var _ = Describe("MediaRepository", func() {
 			Expect(mf.PlayCount).To(Equal(int64(1)))
 		})
 
+		// RD: the counter only updates an existing annotation row, so the first skip or completion of a song the user never annotated is lost.
+		It("IncPlaybackOutcome counts a song's first outcome and later ones, each in its own column", func() {
+			id := "outcome.firsttime"
+			Expect(mr.Put(&model.MediaFile{LibraryID: 1, ID: id})).To(Succeed())
+			Expect(mr.IncPlaybackOutcome(id, model.PlaybackSkipped)).To(Succeed())
+			Expect(mr.IncPlaybackOutcome(id, model.PlaybackSkipped)).To(Succeed())
+			Expect(mr.IncPlaybackOutcome(id, model.PlaybackCompleted)).To(Succeed())
+
+			mf, err := mr.Get(id)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(mf.SkipCount).To(Equal(int64(2)))
+			Expect(mf.CompleteCount).To(Equal(int64(1)))
+		})
+
 		Describe("AverageRating", func() {
 			var raw *mediaFileRepository
 

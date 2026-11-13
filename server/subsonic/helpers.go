@@ -262,6 +262,8 @@ func osChildFromMediaFile(ctx context.Context, mf model.MediaFile) *responses.Op
 	if mf.PlayCount > 0 {
 		child.Played = mf.PlayDate
 	}
+	child.SkipCount = mf.SkipCount
+	child.CompleteCount = mf.CompleteCount
 	child.Comment = mf.Comment
 	child.SortName = sortName(mf.SortTitle, mf.OrderTitle)
 	child.BPM = int32(gg.V(mf.BPM))

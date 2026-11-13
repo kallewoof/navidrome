@@ -566,6 +566,8 @@ type MediaFileRepository interface {
 	// ReassignReferences moves annotations, bookmarks and playlist entries from prevID to newID,
 	// keeping newID's own row wherever a user has both.
 	ReassignReferences(prevID, newID string) error
+	// IncPlaybackOutcome counts how one of the logged user's listens to the media file ended.
+	IncPlaybackOutcome(id string, outcome PlaybackOutcome) error
 
 	// The following methods are used exclusively by the scanner:
 	MarkMissing(bool, ...*MediaFile) error

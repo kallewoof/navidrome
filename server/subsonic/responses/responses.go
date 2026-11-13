@@ -192,6 +192,9 @@ type OpenSubsonicChild struct {
 	Groupings          Array[string]       `xml:"groupings,omitempty"               json:"groupings"`
 	Works              Array[Work]         `xml:"works,omitempty"                   json:"works"`
 	Movements          Array[Movement]     `xml:"movements,omitempty"               json:"movements"`
+	// unimousePlaybackOutcomes extension: how the user's listens ended
+	SkipCount     int64 `xml:"skipCount,attr,omitempty"     json:"skipCount,omitempty"`
+	CompleteCount int64 `xml:"completeCount,attr,omitempty" json:"completeCount,omitempty"`
 }
 
 type Songs struct {

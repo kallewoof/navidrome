@@ -75,6 +75,8 @@ func (r sqlRepository) withAnnotation(query SelectBuilder, idField string) Selec
 			"starred_at",
 			"play_date",
 			"rated_at",
+			"coalesce(skip_count, 0) as skip_count",
+			"coalesce(complete_count, 0) as complete_count",
 		)
 	if conf.Server.AlbumPlayCountMode == consts.AlbumPlayCountModeNormalized && r.tableName == "album" {
 		query = query.Columns(
@@ -177,6 +179,27 @@ func (r sqlRepository) IncPlayCount(itemID string, ts time.Time) error {
 		if err != nil {
 			return err
 		}
+	}
+	return err
+}
+
+var playbackOutcomeColumns = map[model.PlaybackOutcome]string{
+	model.PlaybackSkipped:   "skip_count",
+	model.PlaybackCompleted: "complete_count",
+}
+
+func (r sqlRepository) IncPlaybackOutcome(itemID string, outcome model.PlaybackOutcome) error {
+	col, ok := playbackOutcomeColumns[outcome]
+	if !ok {
+		return fmt.Errorf("unknown playback outcome %d", outcome)
+	}
+	upd := Update(annotationTable).Where(r.annId(itemID)).Set(col, Expr(col+"+1"))
+	c, err := r.executeSQL(upd)
+	if c == 0 || errors.Is(err, sql.ErrNoRows) {
+		ins := Insert(annotationTable).SetMap(map[string]any{
+			"user_id": loggedUser(r.ctx).ID, "item_type": r.tableName, "item_id": itemID, col: 1,
+		})
+		_, err = r.executeSQL(ins)
 	}
 	return err
 }

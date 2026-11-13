@@ -737,6 +737,63 @@ var _ = Describe("PlayTracker", func() {
 			})
 		})
 
+		Describe("playback outcomes", func() {
+			// track 123 lasts 180 s: the play threshold is 90 s, 90% is 162 s.
+			stopAt := func(positionMs int64, ignoreScrobble bool) {
+				Expect(tracker.ReportPlayback(ctx, ReportPlaybackParams{
+					MediaId: "123", PositionMs: 0, State: "starting", PlaybackRate: 1.0, ClientId: defaultClientId,
+				})).To(Succeed())
+				Expect(tracker.ReportPlayback(ctx, ReportPlaybackParams{
+					MediaId: "123", PositionMs: positionMs, State: "stopped", PlaybackRate: 1.0, ClientId: defaultClientId,
+					IgnoreScrobble: ignoreScrobble,
+				})).To(Succeed())
+			}
+
+			// RD: skips are judged against another boundary than plays, so one listen counts as both a play and a skip, or as neither.
+			It("counts a stop before the play threshold as a skip, and only then", func() {
+				stopAt(89_999, false)
+				Expect(track.SkipCount).To(Equal(int64(1)))
+				stopAt(90_000, false)
+				Expect(track.SkipCount).To(Equal(int64(1)))
+				Expect(track.CompleteCount).To(BeZero())
+			})
+
+			// RD: the completion boundary drifts to the very end or down to the play threshold, so a song stopped during its fade-out never counts as finished, or a half-heard one does.
+			It("counts a stop at 90% or later as a completion", func() {
+				stopAt(161_999, false)
+				Expect(track.CompleteCount).To(BeZero())
+				stopAt(162_000, false)
+				Expect(track.CompleteCount).To(Equal(int64(1)))
+				Expect(track.SkipCount).To(BeZero())
+			})
+
+			// RD: a failed count is logged and swallowed, so the client is told its report succeeded while the skip was lost.
+			It("fails the stopped report when the outcome cannot be counted", func() {
+				Expect(tracker.ReportPlayback(ctx, ReportPlaybackParams{
+					MediaId: "123", PositionMs: 0, State: "starting", PlaybackRate: 1.0, ClientId: defaultClientId,
+				})).To(Succeed())
+				ds.MediaFile(ctx).(*tests.MockMediaFileRepo).Err = true
+				DeferCleanup(func() { ds.MediaFile(ctx).(*tests.MockMediaFileRepo).Err = false })
+				err := tracker.ReportPlayback(ctx, ReportPlaybackParams{
+					MediaId: "123", PositionMs: 10_000, State: "stopped", PlaybackRate: 1.0, ClientId: defaultClientId,
+					IgnoreScrobble: true,
+				})
+				Expect(err).To(HaveOccurred())
+			})
+
+			// RD: a song without a known duration gets a zero threshold, so every stop of it counts as a completion.
+			It("counts nothing for a song without a duration", func() {
+				_, ok := playbackOutcome(0, 5_000)
+				Expect(ok).To(BeFalse())
+			})
+
+			// RD: outcomes are counted only on the scrobbling path, so a client that submits plays itself (ignoreScrobble) never has its skips counted.
+			It("counts the outcome when the client submits plays itself", func() {
+				stopAt(10_000, true)
+				Expect(track.SkipCount).To(Equal(int64(1)))
+			})
+		})
+
 		Describe("auto-scrobble", func() {
 			It("scrobbles on stopped when positionMs >= 50% of track", func() {
 				err := tracker.ReportPlayback(ctx, ReportPlaybackParams{

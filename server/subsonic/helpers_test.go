@@ -230,6 +230,15 @@ var _ = Describe("helpers", func() {
 			ctx = context.Background()
 		})
 
+		// RD: the counters are read from the database but never copied into the song response, so the client sees every song as never skipped and never finished.
+		It("reports the user's skips and completions", func() {
+			mf.SkipCount, mf.CompleteCount = 2, 3
+			child := childFromMediaFile(ctx, mf)
+			Expect(child.OpenSubsonicChild).ToNot(BeNil())
+			Expect(child.SkipCount).To(Equal(int64(2)))
+			Expect(child.CompleteCount).To(Equal(int64(3)))
+		})
+
 		Context("with minimal client", func() {
 			BeforeEach(func() {
 				conf.Server.Subsonic.MinimalClients = "minimal-client"

@@ -491,4 +491,26 @@ var _ = Describe("PlaylistRepository", func() {
 				"elevating is what the public image route relies on")
 		})
 	})
+
+	// RD: the playlist track query lists its annotation columns by hand, so a counter added to annotations is missing from every song loaded through a playlist.
+	It("loads playlist tracks with the user's playback outcomes", func() {
+		ctx := request.WithUser(log.NewContext(GinkgoT().Context()), model.User{ID: "userid", UserName: "userid", IsAdmin: true})
+		mfRepo := NewMediaFileRepository(ctx, GetDBXBuilder())
+		song := model.MediaFile{ID: "pls.outcomes", LibraryID: 1, Title: "Outcomes", Path: p("outcomes/song.mp3")}
+		Expect(mfRepo.Put(&song)).To(Succeed())
+		DeferCleanup(func() { _ = mfRepo.Delete(song.ID) })
+		Expect(mfRepo.IncPlaybackOutcome(song.ID, model.PlaybackSkipped)).To(Succeed())
+		Expect(mfRepo.IncPlaybackOutcome(song.ID, model.PlaybackCompleted)).To(Succeed())
+
+		pls := model.Playlist{Name: "Outcomes", OwnerID: "userid"}
+		pls.AddMediaFilesByID([]string{song.ID})
+		Expect(repo.Put(&pls)).To(Succeed())
+		DeferCleanup(func() { _ = repo.Delete(pls.ID) })
+
+		loaded, err := repo.GetWithTracks(pls.ID, false, false)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(loaded.Tracks).To(HaveLen(1))
+		Expect(loaded.Tracks[0].MediaFile.SkipCount).To(Equal(int64(1)))
+		Expect(loaded.Tracks[0].MediaFile.CompleteCount).To(Equal(int64(1)))
+	})
 })

@@ -3,6 +3,7 @@ package tests
 import (
 	"cmp"
 	"errors"
+	"fmt"
 	"maps"
 	"slices"
 	"time"
@@ -200,6 +201,25 @@ func (m *MockMediaFileRepo) IncPlayCount(id string, timestamp time.Time) error {
 		return nil
 	}
 	return model.ErrNotFound
+}
+
+func (m *MockMediaFileRepo) IncPlaybackOutcome(id string, outcome model.PlaybackOutcome) error {
+	if m.Err {
+		return errors.New("error")
+	}
+	d, ok := m.Data[id]
+	if !ok {
+		return model.ErrNotFound
+	}
+	switch outcome {
+	case model.PlaybackSkipped:
+		d.SkipCount++
+	case model.PlaybackCompleted:
+		d.CompleteCount++
+	default:
+		return fmt.Errorf("unknown playback outcome %d", outcome)
+	}
+	return nil
 }
 
 func (m *MockMediaFileRepo) SetStar(starred bool, itemIDs ...string) error {

@@ -371,9 +371,7 @@ func (p *playTracker) ReportPlayback(ctx context.Context, params ReportPlaybackP
 			loadedMF = mf
 			filtered = p.isFilteredOut(ctx, mf)
 			haveVerdict = true
-			trackDurationMs := int64(mf.Duration * 1000)
-			threshold := min(trackDurationMs*50/100, 240_000)
-			if params.PositionMs >= threshold {
+			if params.PositionMs >= scrobbleThresholdMs(mf.Duration) {
 				err = p.incPlay(ctx, mf, now)
 				if err != nil {
 					log.Warn(ctx, "Error updating play counts", "id", mf.ID, "track", mf.Title, "user", user.UserName, err)
@@ -420,6 +418,13 @@ func (p *playTracker) ReportPlayback(ctx context.Context, params ReportPlaybackP
 			filtered = p.isFilteredOut(ctx, &stoppedInfo.MediaFile)
 		}
 		p.enqueuePlaybackReport(ctx, stoppedInfo, filtered)
+		// Counted even with ignoreScrobble: a client that submits plays itself still reports how the listen ended.
+		if outcome, ok := playbackOutcome(stoppedInfo.MediaFile.Duration, params.PositionMs); ok {
+			if err := p.ds.MediaFile(ctx).IncPlaybackOutcome(stoppedInfo.MediaFile.ID, outcome); err != nil {
+				log.Error(ctx, "Error counting playback outcome", "id", stoppedInfo.MediaFile.ID, "user", user.UserName, err)
+				return err
+			}
+		}
 	}
 
 	if conf.Server.EnableNowPlaying {
@@ -443,6 +448,26 @@ func (p *playTracker) ReportPlayback(ctx context.Context, params ReportPlaybackP
 	}
 
 	return nil
+}
+
+// scrobbleThresholdMs is how far into a song a listen counts as a play: half of it, at most 4 minutes.
+func scrobbleThresholdMs(durationSec float32) int64 {
+	return min(int64(durationSec*1000)*50/100, 240_000)
+}
+
+// playbackOutcome classifies a listen that stopped at positionMs: before the play threshold it was
+// skipped, at 90% of the song or later completed; in between, or for a song without a duration, neither.
+func playbackOutcome(durationSec float32, positionMs int64) (model.PlaybackOutcome, bool) {
+	if durationSec <= 0 {
+		return 0, false
+	}
+	switch {
+	case positionMs < scrobbleThresholdMs(durationSec):
+		return model.PlaybackSkipped, true
+	case positionMs >= int64(durationSec*1000)*90/100:
+		return model.PlaybackCompleted, true
+	}
+	return 0, false
 }
 
 func (p *playTracker) GetNowPlaying(ctx context.Context) ([]PlaybackSession, error) {

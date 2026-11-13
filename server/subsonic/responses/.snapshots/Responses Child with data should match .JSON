@@ -130,7 +130,9 @@
             "number": 1,
             "count": 4
           }
-        ]
+        ],
+        "skipCount": 2,
+        "completeCount": 3
       },
       {
         "id": "",

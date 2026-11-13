@@ -386,6 +386,8 @@ func (r *playlistRepository) tracksQuery(query SelectBuilder, id string) SelectB
 			"play_date",
 			"coalesce(rating, 0) as rating",
 			"rated_at",
+			"coalesce(skip_count, 0) as skip_count",
+			"coalesce(complete_count, 0) as complete_count",
 			"f.*",
 			"playlist_tracks.*",
 			"library.path as library_path",

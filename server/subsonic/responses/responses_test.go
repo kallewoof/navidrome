@@ -222,6 +222,7 @@ var _ = Describe("Responses", func() {
 					Groupings:     []string{"Soundtrack", "Live"},
 					ReplayGain:    ReplayGain{TrackGain: new(1.0), AlbumGain: new(2.0), TrackPeak: new(3.0), AlbumPeak: new(4.0), BaseGain: new(5.0), FallbackGain: new(6.0)},
 					DisplayArtist: "artist 1 & artist 2",
+					SkipCount:     2, CompleteCount: 3,
 					Artists: []ArtistID3Ref{
 						{Id: "1", Name: "artist1"},
 						{Id: "2", Name: "artist2"},
