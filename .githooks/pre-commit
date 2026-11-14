@@ -17,6 +17,12 @@ fail() {
   exit 1
 }
 
+# Private strings first, on every commit: scripts/pii-check.sh in the unimouse super-project, which holds the
+# patterns. Outside that checkout there is nothing to check against, which fails rather than passes.
+pii="$(git rev-parse --show-superproject-working-tree)/scripts/pii-check.sh"
+[ -x "$pii" ] || { echo "pre-commit FAILED: $pii not found (run this hook inside the unimouse checkout)"; exit 1; }
+"$pii" || { echo "pre-commit FAILED: private strings (above)"; exit 1; }
+
 staged="$(git diff --cached --name-only --diff-filter=ACMR)"
 go_dirs="$(echo "$staged" | grep '\.go$' | xargs -r -n1 dirname | sort -u)"
 
