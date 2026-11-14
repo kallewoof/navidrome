@@ -781,6 +781,15 @@ var _ = Describe("PlayTracker", func() {
 				Expect(err).To(HaveOccurred())
 			})
 
+			// RD: a stop whose session already expired (a long pause) has no song to judge, so its skip is lost.
+			It("counts the outcome of a stop without a session", func() {
+				Expect(tracker.ReportPlayback(ctx, ReportPlaybackParams{
+					MediaId: "123", PositionMs: 10_000, State: "stopped", PlaybackRate: 1.0, ClientId: defaultClientId,
+					IgnoreScrobble: true,
+				})).To(Succeed())
+				Expect(track.SkipCount).To(Equal(int64(1)))
+			})
+
 			// RD: a song without a known duration gets a zero threshold, so every stop of it counts as a completion.
 			It("counts nothing for a song without a duration", func() {
 				_, ok := playbackOutcome(0, 5_000)

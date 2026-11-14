@@ -404,13 +404,9 @@ func (p *playTracker) ReportPlayback(ctx context.Context, params ReportPlaybackP
 			stoppedInfo.MediaFile = info.MediaFile
 			stoppedInfo.Start = info.Start
 		} else {
-			mf := loadedMF
-			if mf == nil {
-				var mfErr error
-				mf, mfErr = p.ds.MediaFile(ctx).GetWithParticipants(params.MediaId)
-				if mfErr != nil {
-					return mfErr
-				}
+			mf, err := p.mediaFileOr(ctx, loadedMF, params.MediaId)
+			if err != nil {
+				return err
 			}
 			stoppedInfo.MediaFile = *mf
 		}
@@ -419,11 +415,8 @@ func (p *playTracker) ReportPlayback(ctx context.Context, params ReportPlaybackP
 		}
 		p.enqueuePlaybackReport(ctx, stoppedInfo, filtered)
 		// Counted even with ignoreScrobble: a client that submits plays itself still reports how the listen ended.
-		if outcome, ok := playbackOutcome(stoppedInfo.MediaFile.Duration, params.PositionMs); ok {
-			if err := p.ds.MediaFile(ctx).IncPlaybackOutcome(stoppedInfo.MediaFile.ID, outcome); err != nil {
-				log.Error(ctx, "Error counting playback outcome", "id", stoppedInfo.MediaFile.ID, "user", user.UserName, err)
-				return err
-			}
+		if err := p.countOutcome(ctx, &stoppedInfo.MediaFile, params.PositionMs); err != nil {
+			return err
 		}
 	}
 
@@ -447,6 +440,28 @@ func (p *playTracker) ReportPlayback(ctx context.Context, params ReportPlaybackP
 		}
 	}
 
+	return nil
+}
+
+// mediaFileOr returns mf, or loads the media file id when mf is nil.
+func (p *playTracker) mediaFileOr(ctx context.Context, mf *model.MediaFile, id string) (*model.MediaFile, error) {
+	if mf != nil {
+		return mf, nil
+	}
+	return p.ds.MediaFile(ctx).GetWithParticipants(id)
+}
+
+// countOutcome counts how the logged user's listen to mf ended, if it was a skip or a completion.
+func (p *playTracker) countOutcome(ctx context.Context, mf *model.MediaFile, positionMs int64) error {
+	outcome, ok := playbackOutcome(mf.Duration, positionMs)
+	if !ok {
+		return nil
+	}
+	if err := p.ds.MediaFile(ctx).IncPlaybackOutcome(mf.ID, outcome); err != nil {
+		user, _ := request.UserFrom(ctx)
+		log.Error(ctx, "Error counting playback outcome", "id", mf.ID, "user", user.UserName, err)
+		return err
+	}
 	return nil
 }
 
