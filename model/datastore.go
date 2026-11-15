@@ -42,6 +42,7 @@ type DataStore interface {
 	Plugin(ctx context.Context) PluginRepository
 	Artwork(ctx context.Context) ArtworkRepository
 	ArtworkQueue(ctx context.Context) ArtworkQueueRepository
+	TagOverlay(ctx context.Context) TagOverlayRepository
 
 	Resource(ctx context.Context, model any) ResourceRepository
 

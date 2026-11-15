@@ -287,7 +287,17 @@ func (p *phaseFolders) loadTagsFromFiles(entry *folderEntry, toImport map[string
 			log.Warn(p.ctx, "Scanner: Error extracting metadata from files. Skipping", "folder", entry.path, err)
 			return err
 		}
+		overlays, err := p.tagOverlays(chunk, toImport)
+		if err != nil {
+			log.Error(p.ctx, "Scanner: Error loading tag overlays", "folder", entry.path, err)
+			return err
+		}
 		for filePath, info := range allInfo {
+			if prev := toImport[filePath]; prev != nil {
+				if o, ok := overlays[prev.ID]; ok {
+					info.Tags = metadata.ApplyOverlay(info.Tags, o.Tags)
+				}
+			}
 			md := metadata.New(filePath, info)
 			track := md.ToMediaFile(entry.job.lib.ID, entry.id)
 			tracks = append(tracks, track)
@@ -311,6 +321,18 @@ func (p *phaseFolders) loadTagsFromFiles(entry *folderEntry, toImport map[string
 	entry.tracks = tracks
 	entry.tags = slices.Collect(maps.Values(uniqueTags))
 	return nil
+}
+
+// tagOverlays are the users' tag corrections for the files of chunk already in the library, by media file ID. A new
+// file has no ID yet, so no overlay.
+func (p *phaseFolders) tagOverlays(chunk []string, toImport map[string]*model.MediaFile) (map[string]model.TagOverlay, error) {
+	var ids []string
+	for _, filePath := range chunk {
+		if prev := toImport[filePath]; prev != nil {
+			ids = append(ids, prev.ID)
+		}
+	}
+	return p.ds.TagOverlay(p.ctx).GetMany(ids...)
 }
 
 // createAlbumsFromMediaFiles groups the entry's tracks by album ID and creates albums

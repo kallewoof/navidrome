@@ -1,0 +1,29 @@
+{
+  "status": "ok",
+  "version": "1.16.1",
+  "type": "navidrome",
+  "serverVersion": "v0.55.0",
+  "openSubsonic": true,
+  "tagOverlays": {
+    "overlay": [
+      {
+        "id": "1",
+        "path": "Artist A/Album 1/song.mp3",
+        "changed": "0001-01-01T00:00:00Z",
+        "changedBy": "user1",
+        "tag": [
+          {
+            "name": "artist",
+            "value": [
+              "Artist A"
+            ]
+          },
+          {
+            "name": "artists",
+            "value": []
+          }
+        ]
+      }
+    ]
+  }
+}

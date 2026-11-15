@@ -30,6 +30,7 @@ type MockDataStore struct {
 	MockedPlugin         model.PluginRepository
 	MockedArtwork        model.ArtworkRepository
 	MockedArtworkQueue   model.ArtworkQueueRepository
+	MockedTagOverlay     model.TagOverlayRepository
 	scrobbleBufferMu     sync.Mutex
 	repoMu               sync.Mutex
 
@@ -319,6 +320,19 @@ func (db *MockDataStore) ArtworkQueue(ctx context.Context) model.ArtworkQueueRep
 	}
 	db.MockedArtworkQueue = q
 	return db.MockedArtworkQueue
+}
+
+func (db *MockDataStore) TagOverlay(ctx context.Context) model.TagOverlayRepository {
+	db.repoMu.Lock()
+	defer db.repoMu.Unlock()
+	if db.MockedTagOverlay != nil {
+		return db.MockedTagOverlay
+	}
+	if db.RealDS != nil {
+		return db.RealDS.TagOverlay(ctx)
+	}
+	db.MockedTagOverlay = CreateMockTagOverlayRepo()
+	return db.MockedTagOverlay
 }
 
 func (db *MockDataStore) WithTx(block func(tx model.DataStore) error, label ...string) error {

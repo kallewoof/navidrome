@@ -824,6 +824,52 @@ var _ = Describe("Responses", func() {
 		})
 	})
 
+	// The tag overlay's wire format, read by Musly's edit sheet (unimouseTagOverlay): a field present but empty means
+	// the edit clears it, absent means the file's own value stands.
+	Describe("TagOverlay", func() {
+		Context("for a song without an edit", func() {
+			BeforeEach(func() {
+				response.TagOverlay = &TagOverlay{ID: "1"}
+			})
+			It("should match .XML", func() {
+				Expect(xml.MarshalIndent(response, "", "  ")).To(MatchSnapshot())
+			})
+			It("should match .JSON", func() {
+				Expect(json.MarshalIndent(response, "", "  ")).To(MatchSnapshot())
+			})
+		})
+
+		Context("with an edit that sets the artist and clears the composer", func() {
+			BeforeEach(func() {
+				changed := time.Time{}
+				response.TagOverlay = &TagOverlay{ID: "1", Artist: new("Producer A feat. Voice A"), Composer: new(""),
+					Changed: &changed, ChangedBy: "user1"}
+			})
+			It("should match .XML", func() {
+				Expect(xml.MarshalIndent(response, "", "  ")).To(MatchSnapshot())
+			})
+			It("should match .JSON", func() {
+				Expect(json.MarshalIndent(response, "", "  ")).To(MatchSnapshot())
+			})
+		})
+	})
+
+	// The overlay list is what the batch apply writes into the files: raw tag names, and no values for a removed tag.
+	Describe("TagOverlays", func() {
+		BeforeEach(func() {
+			response.TagOverlays = &TagOverlays{Overlay: []TagOverlayFile{{
+				ID: "1", Path: "Artist A/Album 1/song.mp3", ChangedBy: "user1",
+				Tag: []OverlayTag{{Name: "artist", Value: []string{"Artist A"}}, {Name: "artists", Value: []string{}}},
+			}}}
+		})
+		It("should match .XML", func() {
+			Expect(xml.MarshalIndent(response, "", "  ")).To(MatchSnapshot())
+		})
+		It("should match .JSON", func() {
+			Expect(json.MarshalIndent(response, "", "  ")).To(MatchSnapshot())
+		})
+	})
+
 	Describe("Shares", func() {
 		BeforeEach(func() {
 			response.Shares = &Shares{}

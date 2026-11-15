@@ -31,6 +31,7 @@ github.com/navidrome/navidrome/core/storage 89.7
 github.com/navidrome/navidrome/core/storage/local 71.4
 github.com/navidrome/navidrome/core/storage/storagetest 67.7
 github.com/navidrome/navidrome/core/stream 86.4
+github.com/navidrome/navidrome/core/tagoverlay 84.6
 github.com/navidrome/navidrome/db 76.1
 github.com/navidrome/navidrome/db/migrations 61.2
 github.com/navidrome/navidrome/log 81.2

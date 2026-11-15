@@ -63,6 +63,10 @@ type Subsonic struct {
 	PlayQueueByIndex       *PlayQueueByIndex       `xml:"playQueueByIndex,omitempty" json:"playQueueByIndex,omitempty"`
 	TranscodeDecision      *TranscodeDecision      `xml:"transcodeDecision,omitempty"       json:"transcodeDecision,omitempty"`
 	SonicMatches           *Array[SonicMatch]      `xml:"sonicMatch,omitempty"              json:"sonicMatch,omitempty"`
+
+	// unimouseTagOverlay
+	TagOverlay  *TagOverlay  `xml:"tagOverlay,omitempty"  json:"tagOverlay,omitempty"`
+	TagOverlays *TagOverlays `xml:"tagOverlays,omitempty" json:"tagOverlays,omitempty"`
 }
 
 const (
@@ -698,4 +702,35 @@ type StreamDetails struct {
 	AudioProfile    string `xml:"audioProfile,attr,omitempty"    json:"audioProfile,omitempty"`
 	AudioSamplerate int32  `xml:"audioSamplerate,attr,omitempty" json:"audioSamplerate,omitempty"`
 	AudioBitdepth   int32  `xml:"audioBitdepth,attr,omitempty"   json:"audioBitdepth,omitempty"`
+}
+
+// TagOverlay is a song's tag edit (unimouseTagOverlay): the fields its user changed. A field is absent when the
+// edit leaves it as the file has it, and empty when the edit clears it.
+type TagOverlay struct {
+	ID        string     `xml:"id,attr"                  json:"id"`
+	Title     *string    `xml:"title,attr,omitempty"     json:"title,omitempty"`
+	Artist    *string    `xml:"artist,attr,omitempty"    json:"artist,omitempty"`
+	Composer  *string    `xml:"composer,attr,omitempty"  json:"composer,omitempty"`
+	Album     *string    `xml:"album,attr,omitempty"     json:"album,omitempty"`
+	Changed   *time.Time `xml:"changed,attr,omitempty"   json:"changed,omitempty"`
+	ChangedBy string     `xml:"changedBy,attr,omitempty" json:"changedBy,omitempty"`
+}
+
+// TagOverlays lists every song's overlay as the raw tags to write into its file.
+type TagOverlays struct {
+	Overlay []TagOverlayFile `xml:"overlay" json:"overlay"`
+}
+
+type TagOverlayFile struct {
+	ID        string       `xml:"id,attr"        json:"id"`
+	Path      string       `xml:"path,attr"      json:"path"`
+	Changed   time.Time    `xml:"changed,attr"   json:"changed"`
+	ChangedBy string       `xml:"changedBy,attr" json:"changedBy"`
+	Tag       []OverlayTag `xml:"tag"            json:"tag"`
+}
+
+// OverlayTag is one raw tag of an overlay; no values means the tag is removed.
+type OverlayTag struct {
+	Name  string   `xml:"name,attr" json:"name"`
+	Value []string `xml:"value"     json:"value"`
 }
