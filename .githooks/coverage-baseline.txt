@@ -59,7 +59,7 @@ github.com/navidrome/navidrome/server/jellyfin 84.5
 github.com/navidrome/navidrome/server/jellyfin/dto 94.9
 github.com/navidrome/navidrome/server/nativeapi 53.3
 github.com/navidrome/navidrome/server/public 58.6
-github.com/navidrome/navidrome/server/subsonic 62.6
+github.com/navidrome/navidrome/server/subsonic 63.2
 github.com/navidrome/navidrome/server/subsonic/responses 80.0
 github.com/navidrome/navidrome/tests 0.0
 github.com/navidrome/navidrome/tests/harness 0.0
