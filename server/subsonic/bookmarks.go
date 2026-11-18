@@ -1,6 +1,7 @@
 package subsonic
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 	"time"
@@ -172,23 +173,47 @@ func (api *Router) GetPlayQueueByIndex(r *http.Request) (*responses.Subsonic, er
 	}
 
 	response.PlayQueueByIndex = &responses.PlayQueueByIndex{
-		Entry:        slice.MapWithArg(pq.Items, r.Context(), childFromMediaFile),
-		CurrentIndex: index,
-		Position:     pq.Position,
-		Username:     user.UserName,
-		Changed:      pq.UpdatedAt,
-		ChangedBy:    pq.ChangedBy,
+		Entry:         slice.MapWithArg(pq.Items, r.Context(), childFromMediaFile),
+		CurrentIndex:  index,
+		Position:      pq.Position,
+		Username:      user.UserName,
+		Changed:       pq.UpdatedAt,
+		ChangedBy:     pq.ChangedBy,
+		UnimouseState: pq.ClientState,
 	}
 	return response, nil
+}
+
+// maxQueueStateBytes bounds the client state saved with a queue: room for the reasons of a few hundred songs.
+const maxQueueStateBytes = 64 << 10
+
+// queueState reads the optional unimouseState parameter: a JSON object, stored as sent. A client that does not
+// send one saves a queue without state, which clears the state of the queue it replaces.
+func queueState(p *req.Values) (string, error) {
+	state, _ := p.String("unimouseState")
+	if state == "" {
+		return "", nil
+	}
+	if len(state) > maxQueueStateBytes {
+		return "", newError(responses.ErrorGeneric, "unimouseState is %d bytes, over the limit of %d", len(state), maxQueueStateBytes)
+	}
+	var obj map[string]any
+	if err := json.Unmarshal([]byte(state), &obj); err != nil {
+		return "", newError(responses.ErrorGeneric, "unimouseState is not a JSON object: %s", err)
+	}
+	return state, nil
 }
 
 func (api *Router) SavePlayQueueByIndex(r *http.Request) (*responses.Subsonic, error) {
 	p := req.Params(r)
 	ids := p.Strings("id")
+	state, err := queueState(p)
+	if err != nil {
+		return nil, err
+	}
 
 	position := p.Int64Or("position", 0)
 
-	var err error
 	var currentIndex int
 
 	if len(ids) > 0 {
@@ -206,13 +231,14 @@ func (api *Router) SavePlayQueueByIndex(r *http.Request) (*responses.Subsonic, e
 	client, _ := request.ClientFrom(r.Context())
 
 	pq := &model.PlayQueue{
-		UserID:    user.ID,
-		Current:   currentIndex,
-		Position:  position,
-		ChangedBy: client,
-		Items:     items,
-		CreatedAt: time.Time{},
-		UpdatedAt: time.Time{},
+		UserID:      user.ID,
+		Current:     currentIndex,
+		Position:    position,
+		ChangedBy:   client,
+		ClientState: state,
+		Items:       items,
+		CreatedAt:   time.Time{},
+		UpdatedAt:   time.Time{},
 	}
 
 	repo := api.ds.PlayQueue(r.Context())

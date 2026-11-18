@@ -154,5 +154,17 @@ var _ = Describe("Bookmark and PlayQueue Endpoints", Ordered, func() {
 			Expect(*resp.PlayQueueByIndex.CurrentIndex).To(Equal(0))
 			Expect(resp.PlayQueueByIndex.Position).To(Equal(int64(9999)))
 		})
+
+		// RD: the state is dropped on save or not returned, so a device that adopts the queue plays it without the
+		// saving device's Smart Shuffle; or a later save without state keeps the old one, describing another queue.
+		It("savePlayQueueByIndex keeps the client's state with the queue, and a save without one clears it", func() {
+			state := `{"refill":"smartShuffle","shuffle":false}`
+			resp := doReq("savePlayQueueByIndex", "id", trackIDs[0], "currentIndex", "0", "unimouseState", state)
+			Expect(resp.Status).To(Equal(responses.StatusOK))
+			Expect(doReq("getPlayQueueByIndex").PlayQueueByIndex.UnimouseState).To(Equal(state))
+
+			doReq("savePlayQueueByIndex", "id", trackIDs[1], "currentIndex", "0")
+			Expect(doReq("getPlayQueueByIndex").PlayQueueByIndex.UnimouseState).To(BeEmpty())
+		})
 	})
 })

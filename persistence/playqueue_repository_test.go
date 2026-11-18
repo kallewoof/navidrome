@@ -36,6 +36,18 @@ var _ = Describe("PlayQueueRepository", func() {
 			Expect(countPlayQueues(repo, "userid")).To(Equal(1))
 		})
 
+		// RD: the client state column is left out of the mapping, so it is never stored or never read back, and a
+		// device adopting the queue loses the saving device's Smart Shuffle.
+		It("stores the client's state with the queue", func() {
+			q := aPlayQueue("userid", 0, 100, songComeTogether)
+			q.ClientState = `{"refill":"smartShuffle"}`
+			Expect(repo.Store(q)).To(Succeed())
+
+			actual, err := repo.RetrieveWithMediaFiles("userid")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(actual.ClientState).To(Equal(q.ClientState))
+		})
+
 		It("replaces existing playqueue when storing without column names", func() {
 			By("Storing initial playqueue")
 			initial := aPlayQueue("userid", 0, 100, songComeTogether)

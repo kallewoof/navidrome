@@ -811,6 +811,8 @@ var _ = Describe("Responses", func() {
 				response.PlayQueueByIndex.Position = 243
 				response.PlayQueueByIndex.Changed = time.Time{}
 				response.PlayQueueByIndex.ChangedBy = "a_client"
+				// The saving client's state (unimouseQueueState), read back by Musly when it adopts the queue.
+				response.PlayQueueByIndex.UnimouseState = `{"refill":"smartShuffle"}`
 				child := make([]Child, 1)
 				child[0] = Child{Id: "1", Title: "title", IsDir: false}
 				response.PlayQueueByIndex.Entry = child

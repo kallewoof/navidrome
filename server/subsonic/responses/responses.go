@@ -476,6 +476,8 @@ type PlayQueueByIndex struct {
 	Username     string    `xml:"username,attr"           json:"username"`
 	Changed      time.Time `xml:"changed,attr"            json:"changed"`
 	ChangedBy    string    `xml:"changedBy,attr"          json:"changedBy"`
+	// The saving client's own state for the queue (extension unimouseQueueState), as it sent it.
+	UnimouseState string `xml:"unimouseState,attr,omitempty" json:"unimouseState,omitempty"`
 }
 
 type Bookmark struct {

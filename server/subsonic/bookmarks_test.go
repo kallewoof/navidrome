@@ -2,6 +2,8 @@ package subsonic
 
 import (
 	"context"
+	"net/url"
+	"strings"
 
 	"github.com/navidrome/navidrome/model"
 	"github.com/navidrome/navidrome/model/request"
@@ -44,5 +46,42 @@ var _ = Describe("Bookmarks", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(mfRepo.BookmarksAdded).To(ConsistOf("visible"))
 		})
+	})
+
+	Describe("SavePlayQueueByIndex", func() {
+		var pqRepo *tests.MockPlayQueueRepo
+
+		BeforeEach(func() {
+			pqRepo = ds.PlayQueue(ctx).(*tests.MockPlayQueueRepo)
+		})
+
+		// RD: the state is dropped on save or not returned, so a device that adopts the queue plays it without the
+		// saving device's Smart Shuffle.
+		It("returns the client's state with the queue it was saved with", func() {
+			state := `{"refill":"smartShuffle"}`
+			_, err := router.SavePlayQueueByIndex(newGetRequest("id=visible", "currentIndex=0",
+				"unimouseState="+url.QueryEscape(state)).WithContext(ctx))
+			Expect(err).ToNot(HaveOccurred())
+
+			resp, err := router.GetPlayQueueByIndex(newGetRequest().WithContext(ctx))
+
+			Expect(err).ToNot(HaveOccurred())
+			Expect(resp.PlayQueueByIndex.UnimouseState).To(Equal(state))
+		})
+
+		// RD: any string is stored, so a client bug saves state no device can read, and every adopting device fails
+		// on it; or an unbounded one fills the database.
+		DescribeTable("refuses state that is not a JSON object, or too large, and saves nothing",
+			func(state string) {
+				_, err := router.SavePlayQueueByIndex(newGetRequest("id=visible", "currentIndex=0",
+					"unimouseState="+url.QueryEscape(state)).WithContext(ctx))
+
+				Expect(err).To(HaveOccurred())
+				Expect(pqRepo.Queue).To(BeNil())
+			},
+			Entry("not JSON", "not json"),
+			Entry("a JSON array", "[1,2]"),
+			Entry("over 64 KiB", `{"x":"`+strings.Repeat("a", 64<<10)+`"}`),
+		)
 	})
 })
