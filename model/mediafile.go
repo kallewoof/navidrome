@@ -566,8 +566,10 @@ type MediaFileRepository interface {
 	// ReassignReferences moves annotations, bookmarks and playlist entries from prevID to newID,
 	// keeping newID's own row wherever a user has both.
 	ReassignReferences(prevID, newID string) error
-	// IncPlaybackOutcome counts how one of the logged user's listens to the media file ended.
-	IncPlaybackOutcome(id string, outcome PlaybackOutcome) error
+	// IncPlaybackOutcome counts how one of the logged user's listens to the media file ended, at ts.
+	IncPlaybackOutcome(id string, outcome PlaybackOutcome, ts time.Time) error
+	// RecentlyHeard lists the media files the logged user played or skipped at since or later, newest first.
+	RecentlyHeard(since time.Time) ([]HeardSong, error)
 
 	// The following methods are used exclusively by the scanner:
 	MarkMissing(bool, ...*MediaFile) error
@@ -579,4 +581,10 @@ type MediaFileRepository interface {
 	AnnotatedRepository
 	BookmarkableRepository
 	SearchableRepository[MediaFiles]
+}
+
+// HeardSong is when the user last heard a media file: the later of its last play and its last skip.
+type HeardSong struct {
+	ID    string
+	Heard time.Time
 }

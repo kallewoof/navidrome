@@ -749,6 +749,17 @@ var _ = Describe("PlayTracker", func() {
 				})).To(Succeed())
 			}
 
+			// RD: a skip is counted without its time, so Smart Shuffle on another device offers the skipped song again.
+			It("dates a skip, so it is listed as recently heard", func() {
+				before := time.Now().Add(-time.Second)
+				stopAt(30_000, true)
+
+				heard, err := ds.MediaFile(ctx).RecentlyHeard(before)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(heard).To(HaveLen(1))
+				Expect(heard[0].ID).To(Equal("123"))
+			})
+
 			// RD: skips are judged against another boundary than plays, so one listen counts as both a play and a skip, or as neither.
 			It("counts a stop before the play threshold as a skip, and only then", func() {
 				stopAt(89_999, false)

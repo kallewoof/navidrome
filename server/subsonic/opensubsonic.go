@@ -18,6 +18,7 @@ func (api *Router) GetOpenSubsonicExtensions(_ *http.Request) (*responses.Subson
 		{Name: "unimousePlaybackOutcomes", Versions: []int32{1}},
 		{Name: "unimouseTagOverlay", Versions: []int32{1}},
 		{Name: "unimouseQueueState", Versions: []int32{1}},
+		{Name: "unimouseRecentlyHeard", Versions: []int32{1}},
 		{Name: "topSongsByArtistId", Versions: []int32{1}},
 	}
 	if api.sonic != nil && api.sonic.HasProvider() {

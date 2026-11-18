@@ -149,6 +149,7 @@ func (api *Router) routes() http.Handler {
 			h(r, "setTagOverlay", api.SetTagOverlay)
 			h(r, "resetTagOverlay", api.ResetTagOverlay)
 			h(r, "getTagOverlays", api.GetTagOverlays)
+			h(r, "getRecentlyHeard", api.GetRecentlyHeard)
 		})
 		r.Group(func(r chi.Router) {
 			r.Use(getPlayer(api.players))

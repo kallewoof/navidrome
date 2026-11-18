@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/Masterminds/squirrel"
@@ -420,14 +421,44 @@ var _ = Describe("MediaRepository", func() {
 		It("IncPlaybackOutcome counts a song's first outcome and later ones, each in its own column", func() {
 			id := "outcome.firsttime"
 			Expect(mr.Put(&model.MediaFile{LibraryID: 1, ID: id})).To(Succeed())
-			Expect(mr.IncPlaybackOutcome(id, model.PlaybackSkipped)).To(Succeed())
-			Expect(mr.IncPlaybackOutcome(id, model.PlaybackSkipped)).To(Succeed())
-			Expect(mr.IncPlaybackOutcome(id, model.PlaybackCompleted)).To(Succeed())
+			Expect(mr.IncPlaybackOutcome(id, model.PlaybackSkipped, time.Now())).To(Succeed())
+			Expect(mr.IncPlaybackOutcome(id, model.PlaybackSkipped, time.Now())).To(Succeed())
+			Expect(mr.IncPlaybackOutcome(id, model.PlaybackCompleted, time.Now())).To(Succeed())
 
 			mf, err := mr.Get(id)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(mf.SkipCount).To(Equal(int64(2)))
 			Expect(mf.CompleteCount).To(Equal(int64(1)))
+		})
+
+		// RD: skips are not dated (or a later skip's date is not kept), so a song skipped on one device is offered
+		// again by Smart Shuffle on another; or the list misses plays, or lists songs heard long ago.
+		It("RecentlyHeard lists the songs played or skipped since a time, newest first", func() {
+			since := time.Date(2026, 11, 10, 0, 0, 0, 0, time.UTC)
+			for _, id := range []string{"heard.played", "heard.skipped", "heard.old", "heard.skippedtwice"} {
+				Expect(mr.Put(&model.MediaFile{LibraryID: 1, ID: id})).To(Succeed())
+			}
+			Expect(mr.IncPlayCount("heard.played", since.Add(2*time.Hour))).To(Succeed())
+			Expect(mr.IncPlaybackOutcome("heard.skipped", model.PlaybackSkipped, since.Add(3*time.Hour))).To(Succeed())
+			Expect(mr.IncPlayCount("heard.old", since.Add(-time.Hour))).To(Succeed())
+			Expect(mr.IncPlayCount("heard.skippedtwice", since.Add(-time.Hour))).To(Succeed())
+			Expect(mr.IncPlaybackOutcome("heard.skippedtwice", model.PlaybackSkipped, since.Add(time.Hour))).To(Succeed())
+			Expect(mr.IncPlaybackOutcome("heard.skippedtwice", model.PlaybackSkipped, since.Add(4*time.Hour))).To(Succeed())
+
+			heard, err := mr.RecentlyHeard(since)
+
+			Expect(err).ToNot(HaveOccurred())
+			// Other specs play songs now, which is after since: only this spec's songs are compared.
+			var mine []model.HeardSong
+			for _, h := range heard {
+				if strings.HasPrefix(h.ID, "heard.") {
+					mine = append(mine, h)
+				}
+			}
+			Expect(mine).To(HaveLen(3))
+			Expect([]string{mine[0].ID, mine[1].ID, mine[2].ID}).To(
+				Equal([]string{"heard.skippedtwice", "heard.skipped", "heard.played"}))
+			Expect(mine[0].Heard.Unix()).To(Equal(since.Add(4 * time.Hour).Unix()))
 		})
 
 		Describe("AverageRating", func() {

@@ -857,6 +857,21 @@ var _ = Describe("Responses", func() {
 	})
 
 	// The overlay list is what the batch apply writes into the files: raw tag names, and no values for a removed tag.
+	// Read by Musly's Smart Shuffle (unimouseRecentlyHeard) to keep out songs heard on any device.
+	Describe("RecentlyHeard", func() {
+		BeforeEach(func() {
+			response.RecentlyHeard = &RecentlyHeard{Song: []HeardSong{
+				{ID: "1", Heard: time.Date(2026, 11, 18, 9, 30, 0, 0, time.UTC)},
+			}}
+		})
+		It("should match .XML", func() {
+			Expect(xml.MarshalIndent(response, "", "  ")).To(MatchSnapshot())
+		})
+		It("should match .JSON", func() {
+			Expect(json.MarshalIndent(response, "", "  ")).To(MatchSnapshot())
+		})
+	})
+
 	Describe("TagOverlays", func() {
 		BeforeEach(func() {
 			response.TagOverlays = &TagOverlays{Overlay: []TagOverlayFile{{

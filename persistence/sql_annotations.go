@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -188,20 +189,49 @@ var playbackOutcomeColumns = map[model.PlaybackOutcome]string{
 	model.PlaybackCompleted: "complete_count",
 }
 
-func (r sqlRepository) IncPlaybackOutcome(itemID string, outcome model.PlaybackOutcome) error {
+func (r sqlRepository) IncPlaybackOutcome(itemID string, outcome model.PlaybackOutcome, ts time.Time) error {
 	col, ok := playbackOutcomeColumns[outcome]
 	if !ok {
 		return fmt.Errorf("unknown playback outcome %d", outcome)
 	}
 	upd := Update(annotationTable).Where(r.annId(itemID)).Set(col, Expr(col+"+1"))
+	values := map[string]any{"user_id": loggedUser(r.ctx).ID, "item_type": r.tableName, "item_id": itemID, col: 1}
+	// A completion is also a play, dated by the scrobble; a skip is dated here.
+	if outcome == model.PlaybackSkipped {
+		upd = upd.Set("skip_date", Expr("max(ifnull(skip_date,''),?)", ts))
+		values["skip_date"] = ts
+	}
 	c, err := r.executeSQL(upd)
 	if c == 0 || errors.Is(err, sql.ErrNoRows) {
-		ins := Insert(annotationTable).SetMap(map[string]any{
-			"user_id": loggedUser(r.ctx).ID, "item_type": r.tableName, "item_id": itemID, col: 1,
-		})
-		_, err = r.executeSQL(ins)
+		_, err = r.executeSQL(Insert(annotationTable).SetMap(values))
 	}
 	return err
+}
+
+func (r sqlRepository) RecentlyHeard(since time.Time) ([]model.HeardSong, error) {
+	sel := Select("item_id", "play_date", "skip_date").From(annotationTable).
+		Where(Eq{"user_id": loggedUser(r.ctx).ID, "item_type": r.tableName}).
+		Where(Or{GtOrEq{"play_date": since}, GtOrEq{"skip_date": since}})
+	var rows []struct {
+		ItemID   string     `db:"item_id"`
+		PlayDate *time.Time `db:"play_date"`
+		SkipDate *time.Time `db:"skip_date"`
+	}
+	if err := r.queryAll(sel, &rows); err != nil && !errors.Is(err, model.ErrNotFound) {
+		return nil, err
+	}
+	heard := make([]model.HeardSong, 0, len(rows))
+	for _, row := range rows {
+		h := model.HeardSong{ID: row.ItemID}
+		for _, t := range []*time.Time{row.PlayDate, row.SkipDate} {
+			if t != nil && t.After(h.Heard) {
+				h.Heard = *t
+			}
+		}
+		heard = append(heard, h)
+	}
+	slices.SortFunc(heard, func(a, b model.HeardSong) int { return b.Heard.Compare(a.Heard) })
+	return heard, nil
 }
 
 func (r sqlRepository) ReassignAnnotation(prevID string, newID string) error {

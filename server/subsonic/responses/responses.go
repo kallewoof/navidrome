@@ -67,6 +67,8 @@ type Subsonic struct {
 	// unimouseTagOverlay
 	TagOverlay  *TagOverlay  `xml:"tagOverlay,omitempty"  json:"tagOverlay,omitempty"`
 	TagOverlays *TagOverlays `xml:"tagOverlays,omitempty" json:"tagOverlays,omitempty"`
+
+	RecentlyHeard *RecentlyHeard `xml:"recentlyHeard,omitempty" json:"recentlyHeard,omitempty"`
 }
 
 const (
@@ -716,6 +718,16 @@ type TagOverlay struct {
 	Album     *string    `xml:"album,attr,omitempty"     json:"album,omitempty"`
 	Changed   *time.Time `xml:"changed,attr,omitempty"   json:"changed,omitempty"`
 	ChangedBy string     `xml:"changedBy,attr,omitempty" json:"changedBy,omitempty"`
+}
+
+// RecentlyHeard lists the songs the user heard (played or skipped) since a time, newest first.
+type RecentlyHeard struct {
+	Song []HeardSong `xml:"song" json:"song"`
+}
+
+type HeardSong struct {
+	ID    string    `xml:"id,attr"    json:"id"`
+	Heard time.Time `xml:"heard,attr" json:"heard"`
 }
 
 // TagOverlays lists every song's overlay as the raw tags to write into its file.

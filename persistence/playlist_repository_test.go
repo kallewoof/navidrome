@@ -2,6 +2,7 @@ package persistence
 
 import (
 	"slices"
+	"time"
 
 	"github.com/Masterminds/squirrel"
 	"github.com/deluan/rest"
@@ -499,8 +500,8 @@ var _ = Describe("PlaylistRepository", func() {
 		song := model.MediaFile{ID: "pls.outcomes", LibraryID: 1, Title: "Outcomes", Path: p("outcomes/song.mp3")}
 		Expect(mfRepo.Put(&song)).To(Succeed())
 		DeferCleanup(func() { _ = mfRepo.Delete(song.ID) })
-		Expect(mfRepo.IncPlaybackOutcome(song.ID, model.PlaybackSkipped)).To(Succeed())
-		Expect(mfRepo.IncPlaybackOutcome(song.ID, model.PlaybackCompleted)).To(Succeed())
+		Expect(mfRepo.IncPlaybackOutcome(song.ID, model.PlaybackSkipped, time.Now())).To(Succeed())
+		Expect(mfRepo.IncPlaybackOutcome(song.ID, model.PlaybackCompleted, time.Now())).To(Succeed())
 
 		pls := model.Playlist{Name: "Outcomes", OwnerID: "userid"}
 		pls.AddMediaFilesByID([]string{song.ID})

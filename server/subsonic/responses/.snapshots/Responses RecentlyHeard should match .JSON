@@ -1,0 +1,15 @@
+{
+  "status": "ok",
+  "version": "1.16.1",
+  "type": "navidrome",
+  "serverVersion": "v0.55.0",
+  "openSubsonic": true,
+  "recentlyHeard": {
+    "song": [
+      {
+        "id": "1",
+        "heard": "2026-11-18T09:30:00Z"
+      }
+    ]
+  }
+}

@@ -25,6 +25,8 @@ type MockMediaFileRepo struct {
 	model.MediaFileRepository
 	Data map[string]*model.MediaFile
 	Err  bool
+	// Heard is what RecentlyHeard lists, newest first; a skip counted here is added at the front.
+	Heard []model.HeardSong
 	// Add fields and methods for controlling CountAll and DeleteAllMissing in tests.
 	// A nil CountAllValue is unset, and CountAll falls back to counting rows in Data.
 	CountAllValue         *int64
@@ -203,7 +205,7 @@ func (m *MockMediaFileRepo) IncPlayCount(id string, timestamp time.Time) error {
 	return model.ErrNotFound
 }
 
-func (m *MockMediaFileRepo) IncPlaybackOutcome(id string, outcome model.PlaybackOutcome) error {
+func (m *MockMediaFileRepo) IncPlaybackOutcome(id string, outcome model.PlaybackOutcome, ts time.Time) error {
 	if m.Err {
 		return errors.New("error")
 	}
@@ -214,6 +216,7 @@ func (m *MockMediaFileRepo) IncPlaybackOutcome(id string, outcome model.Playback
 	switch outcome {
 	case model.PlaybackSkipped:
 		d.SkipCount++
+		m.Heard = append([]model.HeardSong{{ID: id, Heard: ts}}, m.Heard...)
 	case model.PlaybackCompleted:
 		d.CompleteCount++
 	default:
@@ -415,3 +418,16 @@ func (m *MockMediaFileRepo) MatchesCriteria(string, criteria.Criteria) (bool, er
 
 var _ model.MediaFileRepository = (*MockMediaFileRepo)(nil)
 var _ model.ResourceRepository = (*MockMediaFileRepo)(nil)
+
+func (m *MockMediaFileRepo) RecentlyHeard(since time.Time) ([]model.HeardSong, error) {
+	if m.Err {
+		return nil, errors.New("error")
+	}
+	var out []model.HeardSong
+	for _, h := range m.Heard {
+		if !h.Heard.Before(since) {
+			out = append(out, h)
+		}
+	}
+	return out, nil
+}
