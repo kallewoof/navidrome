@@ -471,19 +471,25 @@ func scrobbleThresholdMs(durationSec float32) int64 {
 }
 
 // playbackOutcome classifies a listen that stopped at positionMs: before the play threshold it was
-// skipped, at 90% of the song or later completed; in between, or for a song without a duration, neither.
+// skipped; at 90% of the song or within its last 30 seconds, whichever comes first, completed (a stop in
+// the outro of a short song is a finish); in between, or for a song without a duration, neither. A skip
+// takes precedence, so a song shorter than a minute is not finished by its first seconds.
 func playbackOutcome(durationSec float32, positionMs int64) (model.PlaybackOutcome, bool) {
 	if durationSec <= 0 {
 		return 0, false
 	}
+	durationMs := int64(durationSec * 1000)
 	switch {
 	case positionMs < scrobbleThresholdMs(durationSec):
 		return model.PlaybackSkipped, true
-	case positionMs >= int64(durationSec*1000)*90/100:
+	case positionMs >= min(durationMs*90/100, durationMs-completionTailMs):
 		return model.PlaybackCompleted, true
 	}
 	return 0, false
 }
+
+// completionTailMs is how close to the end a stop counts as a finish, however long the song.
+const completionTailMs = 30_000
 
 func (p *playTracker) GetNowPlaying(ctx context.Context) ([]PlaybackSession, error) {
 	// The cache is process-global, so it holds every user's playback, across all libraries.

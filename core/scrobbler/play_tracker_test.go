@@ -738,7 +738,7 @@ var _ = Describe("PlayTracker", func() {
 		})
 
 		Describe("playback outcomes", func() {
-			// track 123 lasts 180 s: the play threshold is 90 s, 90% is 162 s.
+			// track 123 lasts 180 s: the play threshold is 90 s, its last 30 s start at 150 s (before 90%, 162 s).
 			stopAt := func(positionMs int64, ignoreScrobble bool) {
 				Expect(tracker.ReportPlayback(ctx, ReportPlaybackParams{
 					MediaId: "123", PositionMs: 0, State: "starting", PlaybackRate: 1.0, ClientId: defaultClientId,
@@ -769,13 +769,30 @@ var _ = Describe("PlayTracker", func() {
 				Expect(track.CompleteCount).To(BeZero())
 			})
 
-			// RD: the completion boundary drifts to the very end or down to the play threshold, so a song stopped during its fade-out never counts as finished, or a half-heard one does.
-			It("counts a stop at 90% or later as a completion", func() {
-				stopAt(161_999, false)
+			// RD: the completion boundary drifts to the very end or down to the play threshold, so a song stopped during its outro never counts as finished, or a half-heard one does.
+			It("counts a stop within the last 30 seconds of a short song as a completion", func() {
+				stopAt(149_999, false)
 				Expect(track.CompleteCount).To(BeZero())
-				stopAt(162_000, false)
+				stopAt(150_000, false)
 				Expect(track.CompleteCount).To(Equal(int64(1)))
 				Expect(track.SkipCount).To(BeZero())
+			})
+
+			// RD: the 30-second tail replaces the 90% rule, so a long song is finished only in its last half
+			// minute, and stopping a 15-minute piece a minute early counts as neither.
+			It("counts a stop at 90% of a long song as a completion", func() {
+				Expect(playbackOutcome(900, 809_999)).To(Equal(model.PlaybackOutcome(0)))
+				outcome, ok := playbackOutcome(900, 810_000)
+				Expect(ok).To(BeTrue())
+				Expect(outcome).To(Equal(model.PlaybackCompleted))
+			})
+
+			// RD: the tail is checked before the skip, so a song shorter than a minute counts as finished when
+			// skipped in its first seconds.
+			It("still counts an early stop of a short song as a skip", func() {
+				outcome, ok := playbackOutcome(40, 15_000)
+				Expect(ok).To(BeTrue())
+				Expect(outcome).To(Equal(model.PlaybackSkipped))
 			})
 
 			// RD: a failed count is logged and swallowed, so the client is told its report succeeded while the skip was lost.
